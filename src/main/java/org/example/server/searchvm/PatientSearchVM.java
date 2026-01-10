@@ -22,7 +22,7 @@ public class PatientSearchVM implements Serializable {
         this.doctorId = doctorId;
     }
 
-    // Getters and Setters
+
     public String getLastName() {
         return lastName;
     }

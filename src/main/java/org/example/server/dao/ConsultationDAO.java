@@ -5,11 +5,7 @@ import java.util.ArrayList;
 import org.example.server.entity.Consultation;
 import org.example.server.searchvm.ConsultationSearchVM;
 
-/**
- * DAO (Data Access Object) pour la gestion des entités {@link Consultation}.
- * Permet de vérifier les relations médecin-patient et de rechercher des
- * consultations.
- */
+
 public class ConsultationDAO {
 
     private Connection connexion;
@@ -18,17 +14,7 @@ public class ConsultationDAO {
         this.connexion = connexion;
     }
 
-    /**
-     * Vérifie si un médecin a eu au moins une consultation avec un patient donné.
-     * Cette méthode est utilisée pour vérifier les droits d'accès avant de
-     * permettre
-     * à un médecin de voir ou créer des rapports pour un patient.
-     *
-     * @param medecinId L'ID du médecin
-     * @param patientId L'ID du patient
-     * @return true si une consultation existe entre les deux, false sinon
-     * @throws SQLException En cas d'erreur d'accès à la base de données
-     */
+
     public boolean medecinAConsultationAvecPatient(int medecinId, int patientId) throws SQLException {
         String sql = "SELECT COUNT(*) FROM consultations WHERE doctor_id = ? AND patient_id = ?";
         try (PreparedStatement stmt = connexion.prepareStatement(sql)) {
@@ -47,15 +33,7 @@ public class ConsultationDAO {
         return false;
     }
 
-    /**
-     * Recherche des consultations en fonction de critères dynamiques.
-     * Effectue des jointures avec les tables Patient et Doctor pour récupérer les
-     * détails associés.
-     *
-     * @param csearchvm L'objet contenant les critères de recherche (noms, dates,
-     *                  motif)
-     * @return Une liste de consultations enrichies avec les infos patient/médecin
-     */
+
     public ArrayList<Consultation> load(ConsultationSearchVM csearchvm) {
         ArrayList<Consultation> consultations = new ArrayList<>();
         try {
@@ -112,15 +90,15 @@ public class ConsultationDAO {
                 Consultation consultation = new Consultation();
                 consultation.setId(rs.getInt("id"));
                 consultation.setDoctor_id(rs.getInt("doctor_id"));
-                
-                // Correction pour gérer patient_id NULL correctement
+
+
                 int patientId = rs.getInt("patient_id");
                 if (rs.wasNull()) {
                     consultation.setPatient_id(null);
                 } else {
                     consultation.setPatient_id(patientId);
                 }
-                
+
                 consultation.setDate(rs.getString("date"));
                 consultation.setHour(rs.getString("hour"));
                 consultation.setReason(rs.getString("reason"));
@@ -140,19 +118,9 @@ public class ConsultationDAO {
         return consultations;
     }
 
-    /**
-     * Réserve une consultation pour un patient.
-     * Met à jour l'ID du patient et la raison de la consultation.
-     * La consultation doit être libre (patient_id IS NULL).
-     *
-     * @param consultationId L'ID de la consultation à réserver
-     * @param patientId      L'ID du patient
-     * @param reason         La raison de la consultation
-     * @return true si la réservation a réussi, false sinon (ex: consultation déjà
-     *         prise ou inexistante)
-     */
+
     public boolean bookConsultation(int consultationId, int patientId, String reason) {
-        // Vérifier que la consultation existe et est disponible (patient_id IS NULL)
+
         String sql = "UPDATE consultations SET patient_id = ?, reason = ? WHERE id = ? AND patient_id IS NULL";
         try (PreparedStatement stmt = connexion.prepareStatement(sql)) {
             stmt.setInt(1, patientId);
@@ -171,13 +139,7 @@ public class ConsultationDAO {
         }
     }
 
-    /**
-     * Annule une consultation (libère le créneau).
-     * Remet patient_id et reason à NULL.
-     *
-     * @param consultationId L'ID de la consultation à annuler
-     * @return true si l'annulation a réussi, false sinon
-     */
+
     public boolean cancelConsultation(int consultationId) {
         String sql = "UPDATE consultations SET patient_id = NULL, reason = NULL WHERE id = ?";
         try (PreparedStatement stmt = connexion.prepareStatement(sql)) {

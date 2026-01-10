@@ -12,15 +12,15 @@ public class SpecialtyDAO {
         this.connexion = connexion;
     }
 
-    // Méthode simple pour récupérer toutes les spécialités
-    // Méthode de recherche avec critères (SearchVM)
+
+
     public ArrayList<Specialty> load(org.example.server.searchvm.SpecialtySearchVM vm) {
         ArrayList<Specialty> liste = new ArrayList<>();
 
         try {
             String sql = "SELECT * FROM specialties WHERE 1=1";
 
-            // Ajout des filtres si le VM n'est pas null
+
             if (vm != null) {
                 if (vm.getName() != null && !vm.getName().isEmpty()) {
                     sql += " AND name LIKE ?";
@@ -29,7 +29,7 @@ public class SpecialtyDAO {
 
             PreparedStatement ps = connexion.prepareStatement(sql);
 
-            // Remplissage des paramètres
+
             if (vm != null) {
                 int index = 1;
                 if (vm.getName() != null && !vm.getName().isEmpty()) {

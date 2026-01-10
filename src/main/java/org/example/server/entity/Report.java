@@ -1,7 +1,7 @@
 package org.example.server.entity;
 
 public class Report {
-    
+
     private Integer id;
     private Integer patient_id;
     private Integer doctor_id;
@@ -21,7 +21,7 @@ public class Report {
         this.date = date;
 
     }
-    
+
     public Integer getId() {
         return id;
     }

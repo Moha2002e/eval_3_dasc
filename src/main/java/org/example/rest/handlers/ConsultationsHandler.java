@@ -1,10 +1,10 @@
-package org.example.server.rest.handlers;
+package org.example.rest.handlers;
 
 import com.sun.net.httpserver.HttpExchange;
 import org.example.server.bd.BdManager;
 import org.example.server.dao.ConsultationDAO;
 import org.example.server.entity.Consultation;
-import org.example.server.rest.RestUtils;
+import org.example.rest.RestUtils;
 import org.example.server.searchvm.ConsultationSearchVM;
 
 import java.io.IOException;
@@ -13,37 +13,15 @@ import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.Map;
 
-/**
- * Handler pour l'endpoint /api/consultations
- * 
- * Routes:
- * - GET /api/consultations
- * - GET /api/consultations?date=2025-10-15
- * - GET /api/consultations?doctor=Maboul
- * - GET /api/consultations?specialty=Neurologie
- * - GET /api/consultations?patientId=249
- * - PUT /api/consultations?id=3
- * - DELETE /api/consultations?id=3
- */
+
 public class ConsultationsHandler extends ApiHandler {
 
-    /**
-     * Constructeur du handler.
-     * 
-     * @param bdManager Le gestionnaire de base de données
-     */
+
     public ConsultationsHandler(BdManager bdManager) {
         super(bdManager);
     }
 
-    /**
-     * Gère les requêtes GET pour récupérer les consultations.
-     * Si patientId est précisé, retourne les consultations réservées par ce patient.
-     * Sinon, retourne les consultations non encore réservées.
-     * 
-     * @param echange L'objet HttpExchange contenant la requête
-     * @throws IOException En cas d'erreur d'I/O
-     */
+
     @Override
     protected void gererGet(HttpExchange echange) throws IOException {
         Map<String, String> parametres = obtenirParametresRequete(echange);
@@ -92,13 +70,7 @@ public class ConsultationsHandler extends ApiHandler {
         envoyerJson(echange, 200, consultations);
     }
 
-    /**
-     * Gère les requêtes PUT pour réserver une consultation.
-     * Met à jour la consultation avec l'ID du patient et la raison.
-     * 
-     * @param echange L'objet HttpExchange contenant la requête
-     * @throws IOException En cas d'erreur d'I/O
-     */
+
     @Override
     protected void gererPut(HttpExchange echange) throws IOException {
         Map<String, String> parametres = obtenirParametresRequete(echange);
@@ -120,9 +92,9 @@ public class ConsultationsHandler extends ApiHandler {
             envoyerErreur(echange, 400, "Body de la requête vide");
             return;
         }
-        
+
         String typeContenu = echange.getRequestHeaders().getFirst("Content-Type");
-        
+
         Map<String, String> donnees;
         if (typeContenu != null && typeContenu.contains("json")) {
             try {
@@ -138,7 +110,7 @@ public class ConsultationsHandler extends ApiHandler {
                     if (valeur == null) {
                         donnees.put(cle, null);
                     } else if (valeur instanceof Number) {
-                        // Si c'est un nombre, convertir en entier puis en String pour éviter "35.0"
+
                         int valeurInt = ((Number) valeur).intValue();
                         donnees.put(cle, String.valueOf(valeurInt));
                         System.out.println("DEBUG: " + cle + " = " + valeur + " (type: " + valeur.getClass().getSimpleName() + ") -> " + valeurInt);
@@ -170,8 +142,8 @@ public class ConsultationsHandler extends ApiHandler {
         }
         int idPatient;
         try {
-            // Nettoyer la chaîne (enlever les espaces) et parser comme double puis convertir en int
-            // Cela gère les cas comme "35.0" ou "35"
+
+
             idPatientStr = idPatientStr.trim();
             System.out.println("DEBUG: patientId après trim = '" + idPatientStr + "'");
             double patientIdDouble = Double.parseDouble(idPatientStr);
@@ -203,13 +175,7 @@ public class ConsultationsHandler extends ApiHandler {
         envoyerJson(echange, codeReponse, reponse);
     }
 
-    /**
-     * Gère les requêtes DELETE pour annuler une consultation.
-     * Libère le créneau en remettant patient_id et reason à NULL.
-     * 
-     * @param echange L'objet HttpExchange contenant la requête
-     * @throws IOException En cas d'erreur d'I/O
-     */
+
     @Override
     protected void gererDelete(HttpExchange echange) throws IOException {
         Map<String, String> parametres = obtenirParametresRequete(echange);

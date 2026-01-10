@@ -2,9 +2,7 @@ package org.example.server.searchvm;
 
 import java.io.Serializable;
 
-/*
-Consultation = ce que tu stockeras en base. C’est ta vraie donnée.
-ConsultationSearchVM = ce que tu utilises pour rechercher.*/
+
 
 public class ConsultationSearchVM implements Serializable {
     private static final long serialVersionUID = 1L;
@@ -28,7 +26,7 @@ public class ConsultationSearchVM implements Serializable {
         this.reason = reason;
     }
 
-    // Getters and Setters
+
     public String getPatientName() {
         return patientName;
     }

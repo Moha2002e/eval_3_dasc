@@ -10,28 +10,28 @@ import java.time.LocalDate;
 import java.util.Base64;
 
 /**
- * Panneau permettant à un médecin d'ajouter un nouveau rapport médical.
- * Ce formulaire permet de sélectionner un patient, une date et de saisir le
- * contenu du rapport.
- * Les données sont chiffrées et signées avant d'être envoyées au serveur.
+ * Panel permettant la création et l'envoi sécurisé de nouveaux rapports
+ * médicaux.
+ * <p>
+ * Fonctionnalités clés :
+ * 1. Sélection d'un patient existant.
+ * 2. Saisie de la date et du contenu.
+ * 3. Chiffrement des données avant envoi (Confidentialité).
+ * 4. Signature numérique des données (Authenticité et Non-répudiation).
+ * </p>
  */
 public class PanelAjoutRapport extends JPanel {
 
-    private GestionnaireConnexion gestionnaireConnexion;
-    private GestionnaireCryptoClient gestionnaireCrypto;
+    private final GestionnaireConnexion gestionnaireConnexion;
+    private final GestionnaireCryptoClient gestionnaireCrypto;
 
+    // --- Composants UI ---
     private JComboBox<PatientItem> comboPatients;
     private JSpinner spinnerDate;
     private JTextArea zoneTexteRapport;
     private JButton boutonEnregistrer;
     private JButton boutonRafraichir;
 
-    /**
-     * Constructeur du panneau d'ajout de rapport.
-     *
-     * @param connexion Le gestionnaire de connexion réseau
-     * @param crypto    Le gestionnaire de cryptographie
-     */
     public PanelAjoutRapport(GestionnaireConnexion connexion, GestionnaireCryptoClient crypto) {
         this.gestionnaireConnexion = connexion;
         this.gestionnaireCrypto = crypto;
@@ -39,62 +39,15 @@ public class PanelAjoutRapport extends JPanel {
         initialiserInterface();
     }
 
-    /**
-     * Initialise l'interface graphique du formulaire.
-     * Configure les champs de sélection du patient, de la date et de saisie du
-     * texte.
-     */
     private void initialiserInterface() {
         setLayout(new BorderLayout(10, 10));
         setBorder(BorderFactory.createEmptyBorder(20, 20, 20, 20));
 
-        // Panel formulaire
-        JPanel panelFormulaire = new JPanel(new GridBagLayout());
-        GridBagConstraints gbc = new GridBagConstraints();
-        gbc.insets = new Insets(5, 5, 5, 5);
-        gbc.fill = GridBagConstraints.HORIZONTAL;
-
-        // Patient
-        gbc.gridx = 0;
-        gbc.gridy = 0;
-        gbc.weightx = 0.3;
-        panelFormulaire.add(new JLabel("Patient:"), gbc);
-
-        gbc.gridx = 1;
-        gbc.weightx = 0.6;
-        comboPatients = new JComboBox<>();
-        panelFormulaire.add(comboPatients, gbc);
-
-        gbc.gridx = 2;
-        gbc.weightx = 0.1;
-        boutonRafraichir = new JButton("🔄");
-        boutonRafraichir.setToolTipText("Rafraîchir la liste des patients");
-        boutonRafraichir.addActionListener(e -> chargerPatients());
-        panelFormulaire.add(boutonRafraichir, gbc);
-
-        // Date
-        gbc.gridx = 0;
-        gbc.gridy = 1;
-        gbc.weightx = 0.3;
-        panelFormulaire.add(new JLabel("Date:"), gbc);
-
-        gbc.gridx = 1;
-        gbc.weightx = 0.7;
-        gbc.gridwidth = 2; // Span across refresh button column
-        SpinnerDateModel model = new SpinnerDateModel();
-        spinnerDate = new JSpinner(model);
-        JSpinner.DateEditor editor = new JSpinner.DateEditor(spinnerDate, "yyyy-MM-dd");
-        spinnerDate.setEditor(editor);
-        spinnerDate.setValue(java.sql.Date.valueOf(LocalDate.now()));
-        panelFormulaire.add(spinnerDate, gbc);
-        gbc.gridwidth = 1; // Reset
-
-        // Charger les patients au démarrage
-        chargerPatients();
-
+        // 1. Formulaire (Patient + Date)
+        JPanel panelFormulaire = creerPanelFormulaire();
         add(panelFormulaire, BorderLayout.NORTH);
 
-        // Zone de texte pour le rapport
+        // 2. Zone de Texte (Contenu)
         JPanel panelTexte = new JPanel(new BorderLayout());
         panelTexte.setBorder(BorderFactory.createTitledBorder("Contenu du Rapport Médical"));
 
@@ -103,106 +56,144 @@ public class PanelAjoutRapport extends JPanel {
         zoneTexteRapport.setWrapStyleWord(true);
         zoneTexteRapport.setFont(new Font("Arial", Font.PLAIN, 12));
 
-        JScrollPane scrollPane = new JScrollPane(zoneTexteRapport);
-        panelTexte.add(scrollPane, BorderLayout.CENTER);
-
+        panelTexte.add(new JScrollPane(zoneTexteRapport), BorderLayout.CENTER);
         add(panelTexte, BorderLayout.CENTER);
 
-        // Bouton enregistrer
+        // 3. Bouton Action
         JPanel panelBoutons = new JPanel(new FlowLayout(FlowLayout.RIGHT));
         boutonEnregistrer = new JButton("📝 Enregistrer le Rapport");
         boutonEnregistrer.setFont(new Font("Arial", Font.BOLD, 14));
-        boutonEnregistrer.addActionListener(e -> enregistrerRapport());
+        boutonEnregistrer.addActionListener(e -> traiterEnregistrement());
         panelBoutons.add(boutonEnregistrer);
 
         add(panelBoutons, BorderLayout.SOUTH);
+
+        // Chargement initial des patients
+        chargerPatients();
+    }
+
+    private JPanel creerPanelFormulaire() {
+        JPanel panel = new JPanel(new GridBagLayout());
+        GridBagConstraints gbc = new GridBagConstraints();
+        gbc.insets = new Insets(5, 5, 5, 5);
+        gbc.fill = GridBagConstraints.HORIZONTAL;
+
+        // Ligne 1 : Sélection Patient
+        gbc.gridx = 0;
+        gbc.gridy = 0;
+        gbc.weightx = 0.1;
+        panel.add(new JLabel("Patient:"), gbc);
+
+        gbc.gridx = 1;
+        gbc.weightx = 0.8;
+        comboPatients = new JComboBox<>();
+        panel.add(comboPatients, gbc);
+
+        gbc.gridx = 2;
+        gbc.weightx = 0.1;
+        boutonRafraichir = new JButton("🔄");
+        boutonRafraichir.setToolTipText("Rafraîchir la liste des patients");
+        boutonRafraichir.addActionListener(e -> chargerPatients());
+        panel.add(boutonRafraichir, gbc);
+
+        // Ligne 2 : Date
+        gbc.gridx = 0;
+        gbc.gridy = 1;
+        gbc.weightx = 0.1;
+        panel.add(new JLabel("Date:"), gbc);
+
+        gbc.gridx = 1;
+        gbc.weightx = 0.9;
+        gbc.gridwidth = 2; // Prend le reste de la largeur
+
+        SpinnerDateModel model = new SpinnerDateModel();
+        spinnerDate = new JSpinner(model);
+        JSpinner.DateEditor editor = new JSpinner.DateEditor(spinnerDate, "yyyy-MM-dd");
+        spinnerDate.setEditor(editor);
+        spinnerDate.setValue(java.sql.Date.valueOf(LocalDate.now())); // Date du jour par défaut
+
+        panel.add(spinnerDate, gbc);
+
+        return panel;
     }
 
     /**
-     * Gère l'enregistrement du rapport.
-     * Cette méthode est appelée lors du clic sur le bouton "Enregistrer".
-     * Elle effectue les opérations suivantes :
-     * 1. Validation des champs.
-     * 2. Chiffrement des données sensibles (date, ID patient, contenu).
-     * 3. Signature numérique des données concaténées.
-     * 4. Envoi de la requête ADD_REPORT au serveur.
-     * 5. Affichage du résultat.
+     * Orchestre le processus d'enregistrement : Validation -> Chiffrement ->
+     * Signature -> Envoi.
      */
-    private void enregistrerRapport() {
+    private void traiterEnregistrement() {
+        // A. Validation des entrées
         PatientItem patientSelectionne = (PatientItem) comboPatients.getSelectedItem();
         if (patientSelectionne == null) {
-            JOptionPane.showMessageDialog(this,
-                    "Veuillez sélectionner un patient",
-                    "Erreur",
-                    JOptionPane.ERROR_MESSAGE);
+            afficherErreur("Veuillez sélectionner un patient.");
             return;
         }
 
         String patientId = String.valueOf(patientSelectionne.getId());
-
         java.util.Date dateValue = (java.util.Date) spinnerDate.getValue();
         java.text.SimpleDateFormat sdf = new java.text.SimpleDateFormat("yyyy-MM-dd");
         String date = sdf.format(dateValue);
-
         String texteRapport = zoneTexteRapport.getText().trim();
 
-        if (patientId.isEmpty() || date.isEmpty() || texteRapport.isEmpty()) {
-            JOptionPane.showMessageDialog(this,
-                    "Veuillez remplir tous les champs",
-                    "Erreur",
-                    JOptionPane.ERROR_MESSAGE);
+        if (texteRapport.isEmpty()) {
+            afficherErreur("Le contenu du rapport ne peut pas être vide.");
             return;
         }
 
+        // B. Verrouillage UI
         boutonEnregistrer.setEnabled(false);
-        boutonEnregistrer.setText("Enregistrement...");
+        boutonEnregistrer.setText("Sécurisation & Envoi...");
 
+        // C. Traitement asynchrone
         new Thread(() -> {
             try {
-                // Chiffrer les données
+                // 1. Chiffrement (AES) des données sensibles
+                // On chiffres les champs individuellement pour que le serveur puisse les
+                // traiter/stocker séparément si besoin
+                // Note: Dans une vraie app, on chiffrerait peut-être tout le JSON, mais ici on
+                // suit le protocole établi.
                 byte[] dateChiffree = gestionnaireCrypto.chiffrer(date);
                 byte[] patientIdChiffre = gestionnaireCrypto.chiffrer(patientId);
                 byte[] texteChiffre = gestionnaireCrypto.chiffrer(texteRapport);
 
-                // Signer les données
-                byte[] donneesASignier = (date + patientId + texteRapport).getBytes();
-                byte[] signature = gestionnaireCrypto.signer(donneesASignier);
+                // 2. Signature (RSA)
+                // On signe la concaténation des données claires pour prouver que c'est bien
+                // nous qui avons émis ces infos.
+                // Le serveur pourra vérifier la signature avec notre clé publique.
+                byte[] donneesASigner = (date + patientId + texteRapport).getBytes();
+                byte[] signature = gestionnaireCrypto.signer(donneesASigner);
 
-                // Encoder en Base64
+                // 3. Encodage Base64 pour le transport
                 String dateBase64 = Base64.getEncoder().encodeToString(dateChiffree);
                 String patientIdBase64 = Base64.getEncoder().encodeToString(patientIdChiffre);
                 String texteBase64 = Base64.getEncoder().encodeToString(texteChiffre);
                 String signatureBase64 = Base64.getEncoder().encodeToString(signature);
 
-                // Envoyer la requête
+                // 4. Construction de la requête protocolaire
+                // Format: ADD_REPORT | DATE_CRYPT | PID_CRYPT | CONTENT_CRYPT | SIGNATURE
                 String requete = Protocol.CMD_ADD_REPORT + "|" + dateBase64 + "|" +
                         patientIdBase64 + "|" + texteBase64 + "|" + signatureBase64;
-                gestionnaireConnexion.envoyerRequete(requete);
 
-                // Recevoir la réponse
+                gestionnaireConnexion.envoyerRequete(requete);
                 String reponse = gestionnaireConnexion.recevoirReponse();
 
+                // D. Traitement réponse
                 SwingUtilities.invokeLater(() -> {
-                    if (reponse.startsWith(Protocol.RESP_OK)) {
+                    if (reponse != null && reponse.startsWith(Protocol.RESP_OK)) {
                         String[] parties = reponse.split("\\|");
-                        String rapportId = parties[1];
-                        JOptionPane.showMessageDialog(this,
-                                "Rapport enregistré avec succès!\nID: " + rapportId,
-                                "Succès",
-                                JOptionPane.INFORMATION_MESSAGE);
+                        String rapportId = (parties.length > 1) ? parties[1] : "?";
 
-                        // Réinitialiser le formulaire
-                        // comboPatients.setSelectedIndex(0); // Optional: reset selection
-                        spinnerDate.setValue(java.sql.Date.valueOf(LocalDate.now()));
-                        zoneTexteRapport.setText("");
+                        JOptionPane.showMessageDialog(this,
+                                "Rapport enregistré et sécurisé avec succès!\nID Reference: " + rapportId,
+                                "Succès", JOptionPane.INFORMATION_MESSAGE);
+
+                        resetFormulaire();
                     } else {
-                        String message = reponse.substring(Protocol.RESP_ERROR.length() + 1);
-                        JOptionPane.showMessageDialog(this,
-                                "Erreur: " + message,
-                                "Erreur",
-                                JOptionPane.ERROR_MESSAGE);
+                        String msg = (reponse != null && reponse.startsWith(Protocol.RESP_ERROR))
+                                ? reponse.substring(Protocol.RESP_ERROR.length() + 1)
+                                : "Réponse inconnue";
+                        afficherErreur("Erreur serveur : " + msg);
                     }
-
                     boutonEnregistrer.setEnabled(true);
                     boutonEnregistrer.setText("📝 Enregistrer le Rapport");
                 });
@@ -210,10 +201,7 @@ public class PanelAjoutRapport extends JPanel {
             } catch (Exception ex) {
                 ex.printStackTrace();
                 SwingUtilities.invokeLater(() -> {
-                    JOptionPane.showMessageDialog(this,
-                            "Erreur: " + ex.getMessage(),
-                            "Erreur",
-                            JOptionPane.ERROR_MESSAGE);
+                    afficherErreur("Erreur technique : " + ex.getMessage());
                     boutonEnregistrer.setEnabled(true);
                     boutonEnregistrer.setText("📝 Enregistrer le Rapport");
                 });
@@ -221,34 +209,31 @@ public class PanelAjoutRapport extends JPanel {
         }).start();
     }
 
-    /**
-     * Charge la liste des patients disponibles depuis le serveur.
-     * Met à jour la liste déroulante des patients.
-     */
     private void chargerPatients() {
         boutonRafraichir.setEnabled(false);
         comboPatients.removeAllItems();
 
         new Thread(() -> {
             try {
+                // Utilisation constante Protocol
                 gestionnaireConnexion.envoyerRequete(Protocol.CMD_LIST_PATIENTS);
                 String reponse = gestionnaireConnexion.recevoirReponse();
 
                 SwingUtilities.invokeLater(() -> {
-                    if (reponse.startsWith(Protocol.RESP_OK)) {
+                    if (reponse != null && reponse.startsWith(Protocol.RESP_OK)) {
                         String[] parties = reponse.split("\\|");
-                        // Format: OK|id,prenom,nom,date|id,prenom,nom,date|...
+                        // Format: OK | ID,Prenom,Nom | ID,Prenom,Nom ...
                         for (int i = 1; i < parties.length; i++) {
                             String[] infos = parties[i].split(",");
                             if (infos.length >= 3) {
-                                int id = Integer.parseInt(infos[0]);
-                                String prenom = infos[1];
-                                String nom = infos[2];
-                                comboPatients.addItem(new PatientItem(id, prenom, nom));
+                                try {
+                                    int id = Integer.parseInt(infos[0]);
+                                    comboPatients.addItem(new PatientItem(id, infos[1], infos[2]));
+                                } catch (NumberFormatException ignored) {
+                                }
                             }
                         }
                     } else {
-                        // Gérer erreur silencieusement ou log
                         System.err.println("Erreur chargement patients: " + reponse);
                     }
                     boutonRafraichir.setEnabled(true);
@@ -260,14 +245,20 @@ public class PanelAjoutRapport extends JPanel {
         }).start();
     }
 
-    /**
-     * Classe interne représentant un élément de la liste des patients.
-     * Permet de stocker l'ID et le nom complet pour l'affichage dans le JComboBox.
-     */
+    private void resetFormulaire() {
+        spinnerDate.setValue(java.sql.Date.valueOf(LocalDate.now()));
+        zoneTexteRapport.setText("");
+    }
+
+    private void afficherErreur(String msg) {
+        JOptionPane.showMessageDialog(this, msg, "Erreur", JOptionPane.ERROR_MESSAGE);
+    }
+
+    // --- Inner Class pour l'affichage dans le ComboBox ---
     private static class PatientItem {
-        private int id;
-        private String prenom;
-        private String nom;
+        private final int id;
+        private final String prenom;
+        private final String nom;
 
         public PatientItem(int id, String prenom, String nom) {
             this.id = id;

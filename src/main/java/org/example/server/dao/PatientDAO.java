@@ -6,10 +6,7 @@ import java.util.List;
 import org.example.server.entity.Patient;
 import org.example.server.searchvm.PatientSearchVM;
 
-/**
- * DAO (Data Access Object) pour la gestion des entités {@link Patient}.
- * Permet de lister et rechercher des patients.
- */
+
 public class PatientDAO {
 
     private Connection connexion;
@@ -18,13 +15,7 @@ public class PatientDAO {
         this.connexion = connexion;
     }
 
-    /**
-     * Liste tous les patients qui ont au moins une consultation enregistrée.
-     * Utilise une requête DISTINCT pour éviter les doublons.
-     *
-     * @return Une liste de patients ayant des consultations
-     * @throws SQLException En cas d'erreur d'accès à la base de données
-     */
+
     public List<Patient> listerPatientsAvecConsultations() throws SQLException {
         String sql = "SELECT DISTINCT p.id, p.first_name, p.last_name, p.birth_date " +
                 "FROM patient p " +
@@ -44,32 +35,20 @@ public class PatientDAO {
         return patients;
     }
 
-    /**
-     * Charge tous les patients sans filtre.
-     *
-     * @return Une liste contenant tous les patients
-     */
+
     public ArrayList<Patient> load() {
         return load(null);
     }
 
-    /**
-     * Recherche des patients en fonction de critères dynamiques.
-     * Si un ID de médecin est fourni dans le SearchVM, ne retourne que les patients
-     * ayant eu une consultation avec ce médecin.
-     *
-     * @param psearchvm L'objet contenant les critères de recherche (nom, prénom,
-     *                  dates, ID médecin)
-     * @return Une liste de patients correspondant aux critères
-     */
+
     public ArrayList<Patient> load(PatientSearchVM psearchvm) {
         ArrayList<Patient> patients = new ArrayList<>();
         try {
-            // On utilise DISTINCT car un patient peut avoir plusieurs consultations avec le
-            // même médecin
+
+
             String query = "SELECT DISTINCT p.* FROM patient p ";
 
-            // Si on filtre par médecin, on doit faire une jointure
+
             if (psearchvm != null && psearchvm.getDoctorId() != null) {
                 query += "INNER JOIN consultations c ON p.id = c.patient_id ";
             }
@@ -136,17 +115,10 @@ public class PatientDAO {
         return patients;
     }
 
-    /**
-     * Crée un patient s'il n'existe pas, ou retourne son ID s'il existe déjà.
-     * La vérification se fait sur le triplet (nom, prénom, date de naissance).
-     *
-     * @param p Le patient à créer ou vérifier
-     * @return L'ID du patient (existant ou nouvellement créé), ou -1 en cas
-     *         d'erreur
-     */
+
     public int createOrUpdatePatient(Patient p) {
         try {
-            // 1. Vérifier si le patient existe déjà
+
             String checkSql = "SELECT id FROM patient WHERE last_name = ? AND first_name = ? AND birth_date = ?";
             try (PreparedStatement checkStmt = connexion.prepareStatement(checkSql)) {
                 checkStmt.setString(1, p.getLast_name());
@@ -155,13 +127,13 @@ public class PatientDAO {
 
                 ResultSet rs = checkStmt.executeQuery();
                 if (rs.next()) {
-                    // Le patient existe, on retourne son ID
+
                     int idPatient = rs.getInt("id");
                     return idPatient;
                 }
             }
 
-            // 2. Le patient n'existe pas, on le crée
+
             String insertSql = "INSERT INTO patient (last_name, first_name, birth_date) VALUES (?, ?, ?)";
             try (PreparedStatement insertStmt = connexion.prepareStatement(insertSql,
                     Statement.RETURN_GENERATED_KEYS)) {
@@ -182,15 +154,10 @@ public class PatientDAO {
         } catch (SQLException e) {
             e.printStackTrace();
         }
-        return -1; // En cas d'erreur
+        return -1;
     }
 
-    /**
-     * Crée un nouveau patient dans la base de données.
-     * 
-     * @param p Le patient à créer
-     * @return L'ID du patient créé, ou -1 en cas d'erreur
-     */
+
     public int create(Patient p) {
         try {
             String insertSql = "INSERT INTO patient (last_name, first_name, birth_date) VALUES (?, ?, ?)";
@@ -212,18 +179,10 @@ public class PatientDAO {
         } catch (SQLException e) {
             e.printStackTrace();
         }
-        return -1; // En cas d'erreur
+        return -1;
     }
 
-    /**
-     * Vérifie si un patient existe déjà dans la base de données.
-     * La vérification se fait sur le triplet (nom, prénom, date de naissance).
-     * 
-     * @param lastName Le nom de famille
-     * @param firstName Le prénom
-     * @param birthDate La date de naissance
-     * @return L'ID du patient s'il existe, ou null s'il n'existe pas
-     */
+
     public Integer findByDetails(String lastName, String firstName, String birthDate) {
         try {
             String checkSql = "SELECT id FROM patient WHERE last_name = ? AND first_name = ? AND birth_date = ?";
@@ -241,6 +200,6 @@ public class PatientDAO {
         } catch (SQLException e) {
             e.printStackTrace();
         }
-        return null; // Patient n'existe pas
+        return null;
     }
 }

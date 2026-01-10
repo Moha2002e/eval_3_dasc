@@ -9,27 +9,35 @@ import java.awt.*;
 import java.util.Base64;
 
 /**
- * Fenêtre de connexion (Login) de l'application cliente.
- * Permet à un médecin de s'authentifier auprès du serveur sécurisé.
- * Gère l'initialisation de la connexion réseau et des outils cryptographiques.
+ * Fenêtre de connexion de l'application client.
+ * <p>
+ * Gère l'authentification sécurisée du médecin auprès du serveur.
+ * Le processus comprend :
+ * 1. Connexion TCP initiale.
+ * 2. Échange de sel (Salt) pour le hachage.
+ * 3. Génération et échange sécurisé de la clé de session (AES).
+ * 4. Validation des identifiants.
+ * </p>
  */
 public class FenetreLogin extends JFrame {
 
+    // --- Constantes d'interface ---
+    private static final String TITRE_FENETRE = "Connexion - Serveur Rapport Médical";
+    private static final String TITRE_APP = "Serveur Rapport Médical Sécurisé";
+    private static final String HOST = "localhost";
+    private static final int PORT = 5000;
+
+    // --- Composants UI ---
     private JTextField champLogin;
     private JPasswordField champMotDePasse;
-    private JTextField champHote;
-    private JTextField champPort;
     private JButton boutonConnecter;
 
+    // --- Gestionnaires Logiques ---
     private GestionnaireConnexion gestionnaireConnexion;
     private GestionnaireCryptoClient gestionnaireCrypto;
 
-    /**
-     * Constructeur de la fenêtre de connexion.
-     * Initialise les gestionnaires de connexion et de cryptographie,
-     * ainsi que l'interface graphique.
-     */
     public FenetreLogin() {
+        // Initialisation des gestionnaires logic
         gestionnaireConnexion = new GestionnaireConnexion();
         gestionnaireCrypto = new GestionnaireCryptoClient();
 
@@ -37,41 +45,26 @@ public class FenetreLogin extends JFrame {
     }
 
     /**
-     * Initialise les composants graphiques de la fenêtre.
-     * Configure le layout, les champs de saisie (hôte, port, login, mot de passe)
-     * et le bouton de connexion.
+     * Configure et affiche l'interface graphique de la fenêtre de login.
      */
     private void initialiserInterface() {
-        setTitle("Connexion - Serveur Rapport Médical");
+        setTitle(TITRE_FENETRE);
         setDefaultCloseOperation(JFrame.EXIT_ON_CLOSE);
-        setSize(450, 350);
-        setLocationRelativeTo(null);
+        setSize(400, 300); // Taille ajustée sans les champs serveur
+        setLocationRelativeTo(null); // Centrer à l'écran
 
-        // Panel principal
         JPanel panelPrincipal = new JPanel();
         panelPrincipal.setLayout(new BoxLayout(panelPrincipal, BoxLayout.Y_AXIS));
-        panelPrincipal.setBorder(BorderFactory.createEmptyBorder(20, 20, 20, 20));
+        panelPrincipal.setBorder(BorderFactory.createEmptyBorder(30, 30, 30, 30));
 
-        // Titre
-        JLabel titre = new JLabel("Serveur Rapport Médical Sécurisé");
+        // 1. Titre de l'application
+        JLabel titre = new JLabel(TITRE_APP);
         titre.setFont(new Font("Arial", Font.BOLD, 18));
         titre.setAlignmentX(Component.CENTER_ALIGNMENT);
         panelPrincipal.add(titre);
-        panelPrincipal.add(Box.createRigidArea(new Dimension(0, 20)));
+        panelPrincipal.add(Box.createRigidArea(new Dimension(0, 30)));
 
-        // Configuration serveur
-        JPanel panelServeur = new JPanel(new GridLayout(2, 2, 10, 10));
-        panelServeur.setBorder(BorderFactory.createTitledBorder("Configuration Serveur"));
-        panelServeur.add(new JLabel("Hôte:"));
-        champHote = new JTextField("localhost");
-        panelServeur.add(champHote);
-        panelServeur.add(new JLabel("Port:"));
-        champPort = new JTextField("5000");
-        panelServeur.add(champPort);
-        panelPrincipal.add(panelServeur);
-        panelPrincipal.add(Box.createRigidArea(new Dimension(0, 15)));
-
-        // Identifiants
+        // 2. Panel Identifiants (Login/Pass)
         JPanel panelIdentifiants = new JPanel(new GridLayout(2, 2, 10, 10));
         panelIdentifiants.setBorder(BorderFactory.createTitledBorder("Identifiants Médecin"));
         panelIdentifiants.add(new JLabel("Login:"));
@@ -80,166 +73,131 @@ public class FenetreLogin extends JFrame {
         panelIdentifiants.add(new JLabel("Mot de passe:"));
         champMotDePasse = new JPasswordField();
         panelIdentifiants.add(champMotDePasse);
-        panelPrincipal.add(panelIdentifiants);
-        panelPrincipal.add(Box.createRigidArea(new Dimension(0, 20)));
 
-        // Bouton connexion
+        panelPrincipal.add(panelIdentifiants);
+        panelPrincipal.add(Box.createRigidArea(new Dimension(0, 30)));
+
+        // 3. Bouton de Connexion
         boutonConnecter = new JButton("Se Connecter");
         boutonConnecter.setAlignmentX(Component.CENTER_ALIGNMENT);
         boutonConnecter.setFont(new Font("Arial", Font.BOLD, 14));
-        boutonConnecter.addActionListener(e -> seConnecter());
+
+        boutonConnecter.addActionListener(e -> lancerConnexion());
+        getRootPane().setDefaultButton(boutonConnecter);
+
         panelPrincipal.add(boutonConnecter);
 
         add(panelPrincipal);
     }
 
     /**
-     * Gère le processus de connexion au serveur.
-     * Cette méthode est appelée lors du clic sur le bouton "Se Connecter".
-     * Elle effectue les étapes suivantes :
-     * 1. Validation des champs de saisie.
-     * 2. Connexion TCP au serveur.
-     * 3. Envoi du login.
-     * 4. Réception du sel cryptographique.
-     * 5. Calcul du digest du mot de passe.
-     * 6. Génération et chiffrement de la clé de session.
-     * 7. Envoi des identifiants sécurisés.
-     * 8. Traitement de la réponse finale (Succès/Échec).
+     * Lance le processus de connexion dans un thread séparé pour ne pas figer l'UI.
      */
-    private void seConnecter() {
+    private void lancerConnexion() {
         String login = champLogin.getText().trim();
         String motDePasse = new String(champMotDePasse.getPassword());
-        String hote = champHote.getText().trim();
-        int port = Integer.parseInt(champPort.getText().trim());
 
+        // Validation basique des champs
         if (login.isEmpty() || motDePasse.isEmpty()) {
-            JOptionPane.showMessageDialog(this, "Veuillez remplir tous les champs",
-                    "Erreur", JOptionPane.ERROR_MESSAGE);
+            afficherErreur("Veuillez remplir tous les champs.");
             return;
         }
 
-        boutonConnecter.setEnabled(false);
-        boutonConnecter.setText("Connexion en cours...");
+        // Désactivation du bouton pour éviter les doubles clics
+        setInterfaceActive(false);
 
-        new Thread(() -> {
-            try {
-                // Étape 1: Connexion au serveur
-                if (!gestionnaireConnexion.connecter(hote, port)) {
-                    SwingUtilities.invokeLater(() -> {
-                        JOptionPane.showMessageDialog(this, "Impossible de se connecter au serveur",
-                                "Erreur", JOptionPane.ERROR_MESSAGE);
-                        boutonConnecter.setEnabled(true);
-                        boutonConnecter.setText("Se Connecter");
-                    });
-                    return;
-                }
-
-                // Étape 2: Envoyer LOGIN avec login
-                gestionnaireConnexion.envoyerRequete(Protocol.CMD_LOGIN + "|" + login);
-                String reponse = gestionnaireConnexion.recevoirReponse();
-
-                if (reponse == null) {
-                    SwingUtilities.invokeLater(() -> {
-                        JOptionPane.showMessageDialog(this, "Aucune réponse du serveur",
-                                "Erreur", JOptionPane.ERROR_MESSAGE);
-                        boutonConnecter.setEnabled(true);
-                        boutonConnecter.setText("Se Connecter");
-                    });
-                    return;
-                }
-
-                if (reponse.startsWith(Protocol.RESP_ERROR)) {
-                    SwingUtilities.invokeLater(() -> {
-                        JOptionPane.showMessageDialog(this, "Médecin inexistant",
-                                "Erreur", JOptionPane.ERROR_MESSAGE);
-                        boutonConnecter.setEnabled(true);
-                        boutonConnecter.setText("Se Connecter");
-                    });
-                    return;
-                }
-
-                // Étape 3: Recevoir le sel
-                String[] parties = reponse.split("\\|");
-                if (!parties[0].equals(Protocol.RESP_SALT)) {
-                    throw new Exception("Réponse inattendue du serveur");
-                }
-                byte[] sel = Base64.getDecoder().decode(parties[1]);
-
-                // Étape 4: Calculer le digest
-                byte[] digest = gestionnaireCrypto.calculerDigestSale(login, motDePasse, sel);
-                String digestBase64 = Base64.getEncoder().encodeToString(digest);
-
-                // Étape 5: Générer et chiffrer la clé de session
-                gestionnaireCrypto.genererCleSession();
-                byte[] cleSessionChiffree = gestionnaireCrypto.chiffrerCleSession();
-                String cleSessionBase64 = Base64.getEncoder().encodeToString(cleSessionChiffree);
-
-                // Étape 6: Envoyer DIGEST + clé de session
-                gestionnaireConnexion.envoyerRequete(Protocol.CMD_LOGIN + "|" + digestBase64 + "|" + cleSessionBase64);
-                reponse = gestionnaireConnexion.recevoirReponse();
-
-                if (reponse == null) {
-                    SwingUtilities.invokeLater(() -> {
-                        JOptionPane.showMessageDialog(this, "Aucune réponse du serveur pour l'authentification",
-                                "Erreur", JOptionPane.ERROR_MESSAGE);
-                        boutonConnecter.setEnabled(true);
-                        boutonConnecter.setText("Se Connecter");
-                    });
-                    return;
-                }
-
-                if (reponse.startsWith(Protocol.RESP_OK)) {
-                    // Authentification réussie
-                    SwingUtilities.invokeLater(() -> {
-                        JOptionPane.showMessageDialog(this, "Connexion réussie!",
-                                "Succès", JOptionPane.INFORMATION_MESSAGE);
-                        ouvrirFenetrePrincipale(login);
-                    });
-                } else {
-                    SwingUtilities.invokeLater(() -> {
-                        JOptionPane.showMessageDialog(this, "Authentification échouée",
-                                "Erreur", JOptionPane.ERROR_MESSAGE);
-                        boutonConnecter.setEnabled(true);
-                        boutonConnecter.setText("Se Connecter");
-                    });
-                }
-
-            } catch (Exception ex) {
-                ex.printStackTrace();
-                SwingUtilities.invokeLater(() -> {
-                    JOptionPane.showMessageDialog(this, "Erreur: " + ex.getMessage(),
-                            "Erreur", JOptionPane.ERROR_MESSAGE);
-                    boutonConnecter.setEnabled(true);
-                    boutonConnecter.setText("Se Connecter");
-                });
-            }
-        }).start();
+        // Exécution en arrière-plan avec les paramètres en dur
+        new Thread(() -> executerProtocoleConnexion(HOST, PORT, login, motDePasse)).start();
     }
 
     /**
-     * Ouvre la fenêtre principale de l'application après une connexion réussie.
-     * Ferme la fenêtre de login actuelle.
-     *
-     * @param login Le login du médecin connecté
+     * Exécute la logique métier de la connexion (Réseau + Crypto).
      */
+    private void executerProtocoleConnexion(String hote, int port, String login, String motDePasse) {
+        try {
+            // A. Connexion TCP
+            if (!gestionnaireConnexion.connecter(hote, port)) {
+                SwingUtilities.invokeLater(() -> {
+                    afficherErreur("Impossible de se connecter au serveur (Connexion refusée).");
+                    setInterfaceActive(true);
+                });
+                return;
+            }
+
+            // B. Envoi Login pour récupérer le Sel (Salt)
+            gestionnaireConnexion.envoyerRequete(Protocol.CMD_LOGIN + "|" + login);
+            String reponse = gestionnaireConnexion.recevoirReponse();
+
+            if (reponse == null || reponse.startsWith(Protocol.RESP_ERROR)) {
+                SwingUtilities.invokeLater(() -> {
+                    afficherErreur("Login refusé ou compte inexistant.");
+                    setInterfaceActive(true);
+                });
+                return;
+            }
+
+            // C. Traitement du Sel et Calcul du Digest
+            String[] parties = reponse.split("\\|");
+            if (!parties[0].equals(Protocol.RESP_SALT)) {
+                throw new Exception("Protocole invalide : Attendu SALT, reçu " + reponse);
+            }
+            byte[] sel = Base64.getDecoder().decode(parties[1]);
+            byte[] digest = gestionnaireCrypto.calculerDigestSale(login, motDePasse, sel);
+            String digestBase64 = Base64.getEncoder().encodeToString(digest);
+
+            // D. Génération et Chiffrement de la Clé de Session
+            gestionnaireCrypto.genererCleSession();
+            byte[] cleSessionChiffree = gestionnaireCrypto.chiffrerCleSession();
+            String cleSessionBase64 = Base64.getEncoder().encodeToString(cleSessionChiffree);
+
+            // E. Envoi des identifiants sécurisés (Digest + Clé Session)
+            gestionnaireConnexion.envoyerRequete(Protocol.CMD_LOGIN + "|" + digestBase64 + "|" + cleSessionBase64);
+            reponse = gestionnaireConnexion.recevoirReponse();
+
+            if (reponse != null && reponse.startsWith(Protocol.RESP_OK)) {
+                // F. Succès final
+                SwingUtilities.invokeLater(() -> {
+                    JOptionPane.showMessageDialog(this, "Connexion réussie!", "Succès",
+                            JOptionPane.INFORMATION_MESSAGE);
+                    ouvrirFenetrePrincipale(login);
+                });
+            } else {
+                SwingUtilities.invokeLater(() -> {
+                    afficherErreur("Authentification échouée (Mot de passe incorrect ?).");
+                    setInterfaceActive(true);
+                });
+            }
+
+        } catch (Exception ex) {
+            ex.printStackTrace();
+            SwingUtilities.invokeLater(() -> {
+                afficherErreur("Erreur technique : " + ex.getMessage());
+                setInterfaceActive(true);
+            });
+        }
+    }
+
     private void ouvrirFenetrePrincipale(String login) {
         FenetrePrincipale fenetrePrincipale = new FenetrePrincipale(login, gestionnaireConnexion, gestionnaireCrypto);
         fenetrePrincipale.setVisible(true);
-        this.dispose();
+        this.dispose(); // Fermer la fenêtre de login
     }
 
-    /**
-     * Point d'entrée de l'application cliente.
-     * Configure le thème graphique (FlatLaf) et lance la fenêtre de login.
-     *
-     * @param args Arguments de la ligne de commande (non utilisés)
-     */
+    private void afficherErreur(String message) {
+        JOptionPane.showMessageDialog(this, message, "Erreur", JOptionPane.ERROR_MESSAGE);
+    }
+
+    private void setInterfaceActive(boolean active) {
+        boutonConnecter.setEnabled(active);
+        boutonConnecter.setText(active ? "Se Connecter" : "Connexion en cours...");
+    }
+
     public static void main(String[] args) {
-        // Appliquer le thème FlatLaf macOS
+        // Appliquer le thème moderne FlatMacLightLaf si disponible
         try {
             com.formdev.flatlaf.themes.FlatMacLightLaf.setup();
         } catch (Exception e) {
-            System.err.println("Impossible de charger le thème FlatLaf");
+            System.err.println("Impossible de charger le thème FlatLaf, utilisation du défaut.");
         }
 
         SwingUtilities.invokeLater(() -> {

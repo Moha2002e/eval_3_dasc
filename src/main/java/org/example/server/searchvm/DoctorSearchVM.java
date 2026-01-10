@@ -18,7 +18,7 @@ public class DoctorSearchVM implements Serializable {
         this.specialityName = specialityName;
     }
 
-    // Getters and Setters
+
     public String getLastName() {
         return lastName;
     }

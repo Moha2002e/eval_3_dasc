@@ -10,7 +10,7 @@ public class Consultation implements Entity {
     private String date ;
     private String hour ;
     private String reason ;
-    // Additional patient info for UI convenience
+
     private String patient_first_name;
     private String patient_last_name;
     private String patient_birth_date;
@@ -124,7 +124,7 @@ public class Consultation implements Entity {
             java.time.ZoneOffset offset = java.time.ZoneId.systemDefault().getRules().getOffset(ldt);
             return OffsetDateTime.of(ldt, offset);
         } catch (Exception e) {
-            // fallback: try parsing as full OffsetDateTime, or current moment
+
             try {
                 return OffsetDateTime.parse(date);
             } catch (Exception ex) {

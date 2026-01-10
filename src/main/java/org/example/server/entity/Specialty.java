@@ -1,9 +1,6 @@
 package org.example.server.entity;
 
-/**
- * Représente une spécialité médicale (ex: Cardiologie, Neurologie).
- * Correspond à la table 'speciality' en base de données.
- */
+
 public class Specialty implements Entity {
 
     private Integer id;

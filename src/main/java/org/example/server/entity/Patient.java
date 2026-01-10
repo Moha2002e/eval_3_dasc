@@ -45,26 +45,26 @@ public class Patient implements Entity {
     }
     @Override
     public String toString() {
-        // Pour l'affichage dans les listes, retourner simplement le nom complet
+
         String ln;
         if (last_name != null) {
             ln = last_name;
         } else {
             ln = "";
         }
-        
+
         String fn;
         if (first_name != null) {
             fn = first_name;
         } else {
             fn = "";
         }
-        
+
         String resultat = ln;
         if (!fn.isBlank()) {
             resultat = resultat + " " + fn;
         }
-        
+
         return resultat;
     }
 }

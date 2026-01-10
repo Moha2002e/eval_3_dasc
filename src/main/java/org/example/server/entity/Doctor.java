@@ -18,7 +18,7 @@ public class Doctor implements Entity {
         this.last_name = last_name;
         this.first_name = first_name;
     }
-    
+
     public Doctor(Integer id, Integer specialite_id, String last_name, String first_name, String password) {
         this.id = id;
         this.specialite_id = specialite_id;
@@ -58,26 +58,26 @@ public class Doctor implements Entity {
     }
     @Override
     public String toString() {
-        // Pour l'affichage dans les listes, retourner simplement le nom complet
+
         String ln;
         if (last_name != null) {
             ln = last_name;
         } else {
             ln = "";
         }
-        
+
         String fn;
         if (first_name != null) {
             fn = first_name;
         } else {
             fn = "";
         }
-        
+
         String resultat = ln;
         if (!fn.trim().isEmpty()) {
             resultat = resultat + " " + fn;
         }
-        
+
         return resultat;
     }
 
@@ -89,19 +89,19 @@ public class Doctor implements Entity {
         } else {
             ln = "";
         }
-        
+
         String fn;
         if (first_name != null) {
             fn = first_name;
         } else {
             fn = "";
         }
-        
+
         String resultat = ln;
         if (!fn.trim().isEmpty()) {
             resultat = resultat + " " + fn;
         }
-        
+
         return resultat.trim();
     }
 }

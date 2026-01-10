@@ -1,48 +1,30 @@
-package org.example.server.rest.handlers;
+package org.example.rest.handlers;
 
 import com.sun.net.httpserver.HttpExchange;
 import org.example.server.bd.BdManager;
 import org.example.server.dao.PatientDAO;
 import org.example.server.entity.Patient;
-import org.example.server.rest.RestUtils;
+import org.example.rest.RestUtils;
 
 import java.io.IOException;
 import java.sql.Connection;
 import java.util.HashMap;
 import java.util.Map;
 
-/**
- * Handler pour l'endpoint /api/patients
- * 
- * Route: POST /api/patients
- * Body: JSON ou form-urlencoded avec lastName, firstName, birthDate, newPatient
- * 
- * Retourne: Succès + ID patient en JSON
- */
+
 public class PatientsHandler extends ApiHandler {
 
-    /**
-     * Constructeur du handler.
-     * 
-     * @param bdManager Le gestionnaire de base de données
-     */
+
     public PatientsHandler(BdManager bdManager) {
-        super(bdManager); // Appel au constructeur parent
+        super(bdManager);
     }
 
-    /**
-     * Gère les requêtes POST pour créer ou vérifier l'existence d'un patient.
-     * Si newPatient est true, crée un nouveau patient.
-     * Sinon, vérifie si le patient existe déjà.
-     * 
-     * @param echange L'objet HttpExchange contenant la requête
-     * @throws IOException En cas d'erreur d'I/O
-     */
+
     @Override
     protected void gererPost(HttpExchange echange) throws IOException {
         String corps = lireCorps(echange);
         String typeContenu = echange.getRequestHeaders().getFirst("Content-Type");
-        
+
         Map<String, String> donnees;
         if (typeContenu != null && typeContenu.contains("json")) {
             Map<String, Object> json = RestUtils.parserJson(corps, Map.class);
@@ -68,7 +50,7 @@ public class PatientsHandler extends ApiHandler {
 
         Connection connexion = obtenirConnexion();
         PatientDAO dao = new PatientDAO(connexion);
-        
+
         int idPatient;
         if (nouveauPatient) {
             Patient patient = new Patient();

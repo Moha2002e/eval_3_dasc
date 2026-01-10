@@ -15,31 +15,32 @@ import java.util.List;
 import java.util.Map;
 
 /**
- * Panneau permettant de lister et consulter les rapports médicaux.
- * Offre une vue tabulaire des rapports avec possibilité de filtrage par
- * patient.
- * Affiche le contenu complet du rapport sélectionné.
- * Gère le déchiffrement des données reçues du serveur.
+ * Panel visualisant les rapports médicaux.
+ * <p>
+ * Ce composant illustre la RÉCEPTION sécurisée de données :
+ * 1. Téléchargement d'un bloc de données chiffrées (AES) accompagné d'un HMAC.
+ * 2. Vérification de l'intégrité via HMAC (Empêche toute modification pendant
+ * le transfert).
+ * 3. Déchiffrement des données (Confidentialité).
+ * 4. Désérialisation JSON et affichage.
+ * </p>
  */
 public class PanelListeRapports extends JPanel {
 
-    private GestionnaireConnexion gestionnaireConnexion;
-    private GestionnaireCryptoClient gestionnaireCrypto;
+    private final GestionnaireConnexion gestionnaireConnexion;
+    private final GestionnaireCryptoClient gestionnaireCrypto;
 
+    // --- Composants UI ---
     private JComboBox<PatientItem> comboPatients;
     private JButton boutonCharger;
     private JButton boutonTous;
     private JTable tableRapports;
     private DefaultTableModel modeleTable;
     private JTextArea zoneTexteRapport;
+
+    // Cache des données déchiffrées
     private List<Map<String, Object>> listeRapportsComplets;
 
-    /**
-     * Constructeur du panneau de liste des rapports.
-     *
-     * @param connexion Le gestionnaire de connexion réseau
-     * @param crypto    Le gestionnaire de cryptographie
-     */
     public PanelListeRapports(GestionnaireConnexion connexion, GestionnaireCryptoClient crypto) {
         this.gestionnaireConnexion = connexion;
         this.gestionnaireCrypto = crypto;
@@ -47,50 +48,47 @@ public class PanelListeRapports extends JPanel {
         initialiserInterface();
     }
 
-    /**
-     * Initialise l'interface graphique.
-     * Configure les filtres, le tableau des rapports et la zone de visualisation.
-     */
     private void initialiserInterface() {
         setLayout(new BorderLayout(10, 10));
         setBorder(BorderFactory.createEmptyBorder(20, 20, 20, 20));
 
-        // Panel filtres
+        // 1. Filtres et Actions
         JPanel panelFiltres = new JPanel(new FlowLayout(FlowLayout.LEFT));
         panelFiltres.add(new JLabel("Filtrer par Patient:"));
 
         comboPatients = new JComboBox<>();
-        // Ajouter un item vide pour "Tous les patients"
-        comboPatients.addItem(new PatientItem(-1, "Tous", "les patients"));
+        comboPatients.addItem(new PatientItem(-1, "Tous", "les patients")); // Option par défaut
         panelFiltres.add(comboPatients);
 
-        boutonCharger = new JButton("🔍 Charger");
-        boutonCharger.addActionListener(e -> {
-            PatientItem selected = (PatientItem) comboPatients.getSelectedItem();
-            if (selected != null && selected.getId() != -1) {
-                chargerRapports(String.valueOf(selected.getId()));
-            } else {
-                chargerRapports("");
-            }
-        });
+        boutonCharger = new JButton("🔍 Rechercher");
+        boutonCharger.addActionListener(e -> actionRechercher());
         panelFiltres.add(boutonCharger);
 
-        // Charger les patients au démarrage
-        chargerPatients();
-
-        boutonTous = new JButton("📋 Tous mes Rapports");
-        boutonTous.addActionListener(e -> chargerRapports(""));
+        boutonTous = new JButton("📋 Voir Tout");
+        boutonTous.addActionListener(e -> chargerRapports("")); // Chaine vide = tout
         panelFiltres.add(boutonTous);
 
         add(panelFiltres, BorderLayout.NORTH);
 
-        // Panel central avec split
-        JSplitPane splitPane = new JSplitPane(JSplitPane.VERTICAL_SPLIT);
-        splitPane.setResizeWeight(0.6);
+        // Chargement initial de la liste des patients pour le filtre
+        chargerListePatientsPourFiltre();
 
-        // Table des rapports
-        JPanel panelTable = new JPanel(new BorderLayout());
-        panelTable.setBorder(BorderFactory.createTitledBorder("Liste des Rapports"));
+        // 2. Zone Principale (SplitPane: Tableau en haut, Détail en bas)
+        JSplitPane splitPane = new JSplitPane(JSplitPane.VERTICAL_SPLIT);
+        splitPane.setResizeWeight(0.6); // 60% pour la table
+
+        // 2a. Tableau
+        splitPane.setTopComponent(creerPanelTable());
+
+        // 2b. Zone de lecture seule
+        splitPane.setBottomComponent(creerPanelLecture());
+
+        add(splitPane, BorderLayout.CENTER);
+    }
+
+    private JPanel creerPanelTable() {
+        JPanel panel = new JPanel(new BorderLayout());
+        panel.setBorder(BorderFactory.createTitledBorder("Liste des Rapports"));
 
         String[] colonnes = { "ID", "Patient ID", "Date", "Aperçu" };
         modeleTable = new DefaultTableModel(colonnes, 0) {
@@ -102,192 +100,164 @@ public class PanelListeRapports extends JPanel {
 
         tableRapports = new JTable(modeleTable);
         tableRapports.setSelectionMode(ListSelectionModel.SINGLE_SELECTION);
+        // Au clic, on affiche le détail en bas
         tableRapports.getSelectionModel().addListSelectionListener(e -> {
             if (!e.getValueIsAdjusting()) {
-                afficherRapportSelectionne();
+                afficherDetailRapport();
             }
         });
 
-        JScrollPane scrollTable = new JScrollPane(tableRapports);
-        panelTable.add(scrollTable, BorderLayout.CENTER);
+        panel.add(new JScrollPane(tableRapports), BorderLayout.CENTER);
+        return panel;
+    }
 
-        splitPane.setTopComponent(panelTable);
-
-        // Zone de texte pour afficher le rapport complet
-        JPanel panelTexte = new JPanel(new BorderLayout());
-        panelTexte.setBorder(BorderFactory.createTitledBorder("Contenu Complet du Rapport"));
+    private JPanel creerPanelLecture() {
+        JPanel panel = new JPanel(new BorderLayout());
+        panel.setBorder(BorderFactory.createTitledBorder("Contenu Complet du Rapport (Déchiffré)"));
 
         zoneTexteRapport = new JTextArea();
         zoneTexteRapport.setLineWrap(true);
         zoneTexteRapport.setWrapStyleWord(true);
         zoneTexteRapport.setFont(new Font("Arial", Font.PLAIN, 12));
-        zoneTexteRapport.setEditable(false);
+        zoneTexteRapport.setEditable(false); // Lecture seule
 
-        JScrollPane scrollTexte = new JScrollPane(zoneTexteRapport);
-        panelTexte.add(scrollTexte, BorderLayout.CENTER);
+        panel.add(new JScrollPane(zoneTexteRapport), BorderLayout.CENTER);
+        return panel;
+    }
 
-        splitPane.setBottomComponent(panelTexte);
-
-        add(splitPane, BorderLayout.CENTER);
+    private void actionRechercher() {
+        PatientItem selected = (PatientItem) comboPatients.getSelectedItem();
+        if (selected != null && selected.getId() != -1) {
+            chargerRapports(String.valueOf(selected.getId()));
+        } else {
+            chargerRapports("");
+        }
     }
 
     /**
-     * Charge les rapports depuis le serveur.
-     * Peut filtrer par patient si un ID est fourni.
-     * Vérifie l'intégrité (HMAC) et déchiffre les données reçues.
-     *
-     * @param patientId L'ID du patient pour filtrer, ou une chaîne vide pour tous
-     *                  les rapports
+     * Charge et DÉCHIFFRE les rapports.
      */
     private void chargerRapports(String patientId) {
-        boutonCharger.setEnabled(false);
-        boutonTous.setEnabled(false);
+        setBoutonsActifs(false);
 
         new Thread(() -> {
             try {
-                // Préparer la requête
                 String requete;
                 if (patientId.isEmpty()) {
                     requete = Protocol.CMD_LIST_REPORTS + "|";
                 } else {
+                    // Même l'ID dans la requête est chiffré pour la confidentialité de la recherche
                     byte[] patientIdChiffre = gestionnaireCrypto.chiffrer(patientId);
                     String patientIdBase64 = Base64.getEncoder().encodeToString(patientIdChiffre);
                     requete = Protocol.CMD_LIST_REPORTS + "|" + patientIdBase64;
                 }
 
-                // Envoyer la requête
                 gestionnaireConnexion.envoyerRequete(requete);
-
-                // Recevoir la réponse
                 String reponse = gestionnaireConnexion.recevoirReponse();
 
-                if (reponse.startsWith(Protocol.RESP_OK)) {
-                    String[] parties = reponse.split("\\|");
-                    int count = Integer.parseInt(parties[1]);
-                    String jsonChiffreBase64 = parties[2];
-                    String hmacBase64 = parties[3];
-
-                    // Déchiffrer le JSON
-                    byte[] jsonChiffre = Base64.getDecoder().decode(jsonChiffreBase64);
-                    byte[] hmac = Base64.getDecoder().decode(hmacBase64);
-
-                    // Vérifier le HMAC
-                    if (!gestionnaireCrypto.verifierHMAC(jsonChiffre, hmac)) {
-                        throw new Exception("HMAC invalide - données corrompues");
-                    }
-
-                    String json = gestionnaireCrypto.dechiffrer(jsonChiffre);
-
-                    // Parser le JSON
-                    Gson gson = new Gson();
-                    Type listType = new TypeToken<List<Map<String, Object>>>() {
-                    }.getType();
-                    List<Map<String, Object>> rapports = gson.fromJson(json, listType);
-
-                    // Stocker la liste complète
-                    listeRapportsComplets = rapports;
-
-                    // Mettre à jour la table
-                    SwingUtilities.invokeLater(() -> {
-                        modeleTable.setRowCount(0);
-                        for (Map<String, Object> rapport : rapports) {
-                            int id = ((Double) rapport.get("id")).intValue();
-                            int patId = ((Double) rapport.get("patientId")).intValue();
-                            String date = (String) rapport.get("dateRapport");
-                            String texte = (String) rapport.get("texteRapport");
-
-                            String apercu;
-                            if (texte.length() > 50) {
-                                apercu = texte.substring(0, 50) + "...";
-                            } else {
-                                apercu = texte;
-                            }
-
-                            modeleTable.addRow(new Object[] { id, patId, date, apercu });
-                        }
-
-                        JOptionPane.showMessageDialog(this,
-                                count + " rapport(s) chargé(s)",
-                                "Succès",
-                                JOptionPane.INFORMATION_MESSAGE);
-
-                        boutonCharger.setEnabled(true);
-                        boutonTous.setEnabled(true);
-                    });
-
+                if (reponse.startsWith(Protocol.RESP_OK)) { // le startwith permet de vérifier que la réponse commence par OK
+                    traiterReponseRapports(reponse);
                 } else {
-                    SwingUtilities.invokeLater(() -> {
-                        String message = reponse.substring(Protocol.RESP_ERROR.length() + 1);
-                        JOptionPane.showMessageDialog(this,
-                                "Erreur: " + message,
-                                "Erreur",
-                                JOptionPane.ERROR_MESSAGE);
-                        boutonCharger.setEnabled(true);
-                        boutonTous.setEnabled(true);
-                    });
+                    String msg = reponse.startsWith(Protocol.RESP_ERROR)
+                            ? reponse.substring(Protocol.RESP_ERROR.length() + 1)
+                            : "Erreur inconnue";
+                    SwingUtilities.invokeLater(() -> afficherErreurAndUnlock(msg));
                 }
 
             } catch (Exception ex) {
                 ex.printStackTrace();
-                SwingUtilities.invokeLater(() -> {
-                    JOptionPane.showMessageDialog(this,
-                            "Erreur: " + ex.getMessage(),
-                            "Erreur",
-                            JOptionPane.ERROR_MESSAGE);
-                    boutonCharger.setEnabled(true);
-                    boutonTous.setEnabled(true);
-                });
+                SwingUtilities.invokeLater(() -> afficherErreurAndUnlock("Erreur: " + ex.getMessage()));
             }
         }).start();
     }
 
     /**
-     * Affiche le contenu complet du rapport sélectionné dans le tableau.
-     * Récupère le texte complet depuis la liste en mémoire.
+     * Traite la réponse cryptée du serveur.
+     * C'est ici que se passe la vérification HMAC et le déchiffrement.
      */
-    private void afficherRapportSelectionne() {
-        int ligneSelectionnee = tableRapports.getSelectedRow();
-        if (ligneSelectionnee >= 0) {
-            // Récupérer l'ID du rapport sélectionné (colonne 0)
-            int idSelectionne = (int) modeleTable.getValueAt(ligneSelectionnee, 0);
+    private void traiterReponseRapports(String reponse) throws Exception {
+        String[] parties = reponse.split("\\|");
 
-            // Chercher le contenu complet dans la liste
-            if (listeRapportsComplets != null) {
-                for (Map<String, Object> rapport : listeRapportsComplets) {
-                    int id = ((Double) rapport.get("id")).intValue();
-                    if (id == idSelectionne) {
-                        String texteComplet = (String) rapport.get("texteRapport");
-                        zoneTexteRapport.setText(texteComplet);
-                        return;
-                    }
-                }
-            }
+        // Format: OK | Count | JSON_AES_Base64 | HMAC_Base64
+        int count = Integer.parseInt(parties[1]);
+        String jsonChiffreBase64 = parties[2];
+        String hmacBase64 = parties[3];
 
-            // Fallback
-            String apercu = (String) modeleTable.getValueAt(ligneSelectionnee, 3);
-            zoneTexteRapport.setText(apercu);
+        byte[] jsonChiffre = Base64.getDecoder().decode(jsonChiffreBase64);
+        byte[] hmacRecu = Base64.getDecoder().decode(hmacBase64);
+
+        // 1. VERIFICATION INTEGRITE (HMAC)
+        // On vérifie que le bloc chiffré n'a pas été altéré
+        if (!gestionnaireCrypto.verifierHMAC(jsonChiffre, hmacRecu)) {
+            throw new SecurityException(
+                    "ALERTE SECURITE : HMAC invalide ! Les données ont peut-être été altérées en transit.");
         }
+
+        // 2. DECHIFFREMENT (AES)
+        String jsonClair = gestionnaireCrypto.dechiffrer(jsonChiffre);
+
+        // 3. PARSING JSON
+        Gson gson = new Gson();
+        Type listType = new TypeToken<List<Map<String, Object>>>() {
+        }.getType();
+        List<Map<String, Object>> rapports = gson.fromJson(jsonClair, listType);
+
+        this.listeRapportsComplets = rapports;
+
+        // 4. MISE A JOUR UI
+        SwingUtilities.invokeLater(() -> {
+            modeleTable.setRowCount(0);
+            for (Map<String, Object> rapport : rapports) {
+                // Le JSON contient des Nombres sous forme de Double par défaut avec Gson
+                // générique
+                int id = ((Double) rapport.get("id")).intValue();
+                int patId = ((Double) rapport.get("patientId")).intValue();
+                String date = (String) rapport.get("dateRapport");
+                String texte = (String) rapport.get("texteRapport");
+
+                String apercu = (texte.length() > 50) ? texte.substring(0, 50) + "..." : texte;
+                modeleTable.addRow(new Object[] { id, patId, date, apercu });
+            }
+            JOptionPane.showMessageDialog(this, count + " rapport(s) déchiffré(s) avec succès.", "Données Sécurisées",
+                    JOptionPane.INFORMATION_MESSAGE);
+            setBoutonsActifs(true);
+        });
     }
 
-    /**
-     * Charge la liste des patients pour le filtre.
-     */
-    private void chargerPatients() {
+    private void afficherDetailRapport() {
+        int ligneSelectionnee = tableRapports.getSelectedRow();
+        if (ligneSelectionnee >= 0 && listeRapportsComplets != null) {
+            int idSelectionne = (int) modeleTable.getValueAt(ligneSelectionnee, 0);
+
+            // Recherche du texte complet dans notre liste en mémoire
+            for (Map<String, Object> rapport : listeRapportsComplets) {
+                int id = ((Double) rapport.get("id")).intValue();
+                if (id == idSelectionne) {
+                    zoneTexteRapport.setText((String) rapport.get("texteRapport"));
+                    return; // Trouvé
+                }
+            }
+        }
+        zoneTexteRapport.setText("");
+    }
+
+    private void chargerListePatientsPourFiltre() {
         new Thread(() -> {
             try {
                 gestionnaireConnexion.envoyerRequete(Protocol.CMD_LIST_PATIENTS);
                 String reponse = gestionnaireConnexion.recevoirReponse();
 
                 SwingUtilities.invokeLater(() -> {
-                    if (reponse.startsWith(Protocol.RESP_OK)) {
+                    if (reponse != null && reponse.startsWith(Protocol.RESP_OK)) {
                         String[] parties = reponse.split("\\|");
                         for (int i = 1; i < parties.length; i++) {
                             String[] infos = parties[i].split(",");
                             if (infos.length >= 3) {
-                                int id = Integer.parseInt(infos[0]);
-                                String prenom = infos[1];
-                                String nom = infos[2];
-                                comboPatients.addItem(new PatientItem(id, prenom, nom));
+                                try {
+                                    int id = Integer.parseInt(infos[0]);
+                                    comboPatients.addItem(new PatientItem(id, infos[1], infos[2]));
+                                } catch (NumberFormatException ignored) {
+                                }
                             }
                         }
                     }
@@ -298,13 +268,21 @@ public class PanelListeRapports extends JPanel {
         }).start();
     }
 
-    /**
-     * Classe interne pour les éléments de la combobox patients.
-     */
+    private void setBoutonsActifs(boolean actif) {
+        boutonCharger.setEnabled(actif);
+        boutonTous.setEnabled(actif);
+    }
+
+    private void afficherErreurAndUnlock(String msg) {
+        JOptionPane.showMessageDialog(this, msg, "Erreur", JOptionPane.ERROR_MESSAGE);
+        setBoutonsActifs(true);
+    }
+
+    // --- Inner Classes ---
     private static class PatientItem {
-        private int id;
-        private String prenom;
-        private String nom;
+        private final int id;
+        private final String prenom;
+        private final String nom;
 
         public PatientItem(int id, String prenom, String nom) {
             this.id = id;
@@ -318,9 +296,7 @@ public class PanelListeRapports extends JPanel {
 
         @Override
         public String toString() {
-            if (id == -1)
-                return prenom + " " + nom;
-            return id + " - " + prenom + " " + nom;
+            return (id == -1) ? prenom + " " + nom : id + " - " + prenom + " " + nom;
         }
     }
 }

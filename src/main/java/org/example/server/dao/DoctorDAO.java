@@ -6,10 +6,7 @@ import org.example.server.entity.Doctor;
 import org.example.server.entity.Specialty;
 import org.example.server.searchvm.DoctorSearchVM;
 
-/**
- * DAO (Data Access Object) pour la gestion des entités {@link Doctor}.
- * Fournit des méthodes pour l'authentification et la recherche de médecins.
- */
+
 public class DoctorDAO {
 
     private Connection connexion;
@@ -18,14 +15,7 @@ public class DoctorDAO {
         this.connexion = connexion;
     }
 
-    /**
-     * Vérifie si un médecin existe dans la base de données à partir de son login.
-     * Le login est formé par la concaténation "prenom.nom".
-     *
-     * @param login Le login du médecin (format: prenom.nom)
-     * @return true si le médecin existe, false sinon
-     * @throws SQLException En cas d'erreur d'accès à la base de données
-     */
+
     public boolean medecinExiste(String login) throws SQLException {
         String sql = "SELECT COUNT(*) FROM doctor WHERE CONCAT(first_name, '.', last_name) = ?";
         try (PreparedStatement stmt = connexion.prepareStatement(sql)) {
@@ -43,13 +33,7 @@ public class DoctorDAO {
         return false;
     }
 
-    /**
-     * Récupère le mot de passe haché d'un médecin à partir de son login.
-     *
-     * @param login Le login du médecin
-     * @return Le mot de passe haché, ou null si le médecin n'est pas trouvé
-     * @throws SQLException En cas d'erreur d'accès à la base de données
-     */
+
     public String getMotDePasseMedecin(String login) throws SQLException {
         String sql = "SELECT password FROM doctor WHERE CONCAT(first_name, '.', last_name) = ?";
         try (PreparedStatement stmt = connexion.prepareStatement(sql)) {
@@ -63,13 +47,7 @@ public class DoctorDAO {
         return null;
     }
 
-    /**
-     * Récupère l'identifiant unique d'un médecin à partir de son login.
-     *
-     * @param login Le login du médecin
-     * @return L'ID du médecin, ou null si non trouvé
-     * @throws SQLException En cas d'erreur d'accès à la base de données
-     */
+
     public Integer getIdMedecin(String login) throws SQLException {
         String sql = "SELECT id FROM doctor WHERE CONCAT(first_name, '.', last_name) = ?";
         try (PreparedStatement stmt = connexion.prepareStatement(sql)) {
@@ -83,13 +61,7 @@ public class DoctorDAO {
         return null;
     }
 
-    /**
-     * Recherche des médecins en fonction de critères dynamiques.
-     *
-     * @param dsearchvm L'objet contenant les critères de recherche (nom, prénom,
-     *                  spécialité)
-     * @return Une liste de médecins correspondant aux critères
-     */
+
     public ArrayList<Doctor> load(DoctorSearchVM dsearchvm) {
         ArrayList<Doctor> doctors = new ArrayList<>();
         try {
@@ -133,8 +105,8 @@ public class DoctorDAO {
                 doctor.setSpecialite_id(rs.getInt("specialite_id"));
                 doctor.setLast_name(rs.getString("last_name"));
                 doctor.setFirst_name(rs.getString("first_name"));
-                // doctor.setPassword(rs.getString("password")); // Optional, depending on
-                // security requirements
+
+
 
                 doctors.add(doctor);
             }
@@ -147,24 +119,20 @@ public class DoctorDAO {
         return doctors;
     }
 
-    /**
-     * Récupère toutes les spécialités disponibles dans la base de données.
-     * 
-     * @return Une liste de toutes les spécialités
-     */
+
     public ArrayList<Specialty> getAllSpecialties() {
         ArrayList<Specialty> specialties = new ArrayList<>();
         try {
             String sql = "SELECT * FROM specialties ORDER BY name";
             PreparedStatement stmt = connexion.prepareStatement(sql);
             ResultSet rs = stmt.executeQuery();
-            
+
             while (rs.next()) {
                 int id = rs.getInt("id");
                 String name = rs.getString("name");
                 specialties.add(new Specialty(id, name));
             }
-            
+
             rs.close();
             stmt.close();
         } catch (SQLException e) {
