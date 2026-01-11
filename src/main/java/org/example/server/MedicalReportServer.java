@@ -21,6 +21,7 @@ public class MedicalReportServer {
     public MedicalReportServer(int port, int taillePoolThreads) {
         this.port = port;
         this.taillePoolThreads = taillePoolThreads;
+        //on prépare un nb max de thread, pour pas que notre serveur plante
         this.poolThreads = Executors.newFixedThreadPool(taillePoolThreads);
         this.gestionnaireBd = new BdManager();
         this.enCours = false;
@@ -29,8 +30,6 @@ public class MedicalReportServer {
 
     public void demarrer() {
         enCours = true;
-
-
         try {
             gestionnaireBd.connecter();
         } catch (SQLException e) {
@@ -41,12 +40,11 @@ public class MedicalReportServer {
 
         try (ServerSocket socketServeur = new ServerSocket(port)) {
 
-            while (enCours) {
+            while (enCours) {//on attend juste la connexion
                 try {
-
+                    //on attend qu'un client se connecte
                     Socket socketClient = socketServeur.accept();
-
-
+                    //c'est ici le thread à la demande, on donne le traitement du client au pool de thread
                     poolThreads.submit(new ClientHandler(socketClient, gestionnaireBd));
                 } catch (IOException e) {
                     if (enCours) {
@@ -65,9 +63,8 @@ public class MedicalReportServer {
 
     public void arreter() {
         enCours = false;
+        //on libere le thread lorsque le serveur n'en a plus besoin
         poolThreads.shutdown();
-
-
         try {
             if (gestionnaireBd != null) {
                 gestionnaireBd.deconnecter();

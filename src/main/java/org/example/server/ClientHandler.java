@@ -166,8 +166,8 @@ public class ClientHandler implements Runnable {
 
             byte[] cleSessionChiffree = Base64.getDecoder().decode(cleSessionChiffreeBase64);
             byte[] cleSessionBytes = GestionnaireCrypto.dechiffrerRSA(cleSessionChiffree, clePriveeServeur);
-            cleSession = GestionnaireCrypto.base64VersCleSecrete(
-                    Base64.getEncoder().encodeToString(cleSessionBytes));
+            //transforme en string, et transforme cle secrète qui est la clé de session
+            cleSession = GestionnaireCrypto.base64VersCleSecrete(Base64.getEncoder().encodeToString(cleSessionBytes)); // elle permet de reconstituer la clé de session
 
 
             idMedecinCourant = gestionnaireBd.getIdMedecin(loginCourant);
@@ -235,7 +235,6 @@ public class ClientHandler implements Runnable {
         String nouveauTexte = new String(GestionnaireCrypto.dechiffrerAES(texteChiffre, cleSession));
 
         int rapportId = Integer.parseInt(rapportIdStr);
-
 
         boolean succes = gestionnaireBd.modifierRapport(rapportId, nouveauTexte, idMedecinCourant);
 

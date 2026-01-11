@@ -11,7 +11,7 @@ import java.sql.SQLException;
 
 public class RestServer {
 
-    private static final int PORT = 8080;
+    private static final int PORT = 9090;
     private HttpServer serveur;
     private BdManager bdManager;
 
@@ -32,10 +32,13 @@ public class RestServer {
             serveur.createContext("/api/consultations", new ConsultationsHandler(bdManager));
 
             serveur.start();
+            System.out.println("✓ REST server started on port " + PORT);
         } catch (IOException e) {
-
+            System.err.println("✗ I/O error while starting RestServer: " + e.getMessage());
+            e.printStackTrace();
         } catch (SQLException e) {
-
+            System.err.println("✗ Database error while starting RestServer: " + e.getMessage());
+            e.printStackTrace();
         }
     }
 
@@ -47,7 +50,8 @@ public class RestServer {
         try {
             bdManager.deconnecter();
         } catch (SQLException e) {
-
+            System.err.println("✗ Error while disconnecting from DB: " + e.getMessage());
+            e.printStackTrace();
         }
     }
 
@@ -59,5 +63,19 @@ public class RestServer {
         Runtime.getRuntime().addShutdownHook(new Thread(() -> {
             serveur.stop();
         }));
+
+        // Si le serveur a bien démarré, on bloque le thread principal pour garder
+        // le processus actif (HttpServer démarre des threads en arrière-plan mais
+        // il est utile d'empêcher la fin immédiate de main si start() a réussi).
+        if (serveur.serveur != null) {
+            System.out.println("Serveur REST en cours d'exécution. Ctrl+C pour arrêter.");
+            try {
+                Thread.sleep(Long.MAX_VALUE);
+            } catch (InterruptedException e) {
+                Thread.currentThread().interrupt();
+            }
+        } else {
+            System.err.println("Serveur REST n'a pas démarré correctement. Voir les logs pour les détails.");
+        }
     }
 }
