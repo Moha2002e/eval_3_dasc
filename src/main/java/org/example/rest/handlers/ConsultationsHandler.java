@@ -13,14 +13,11 @@ import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.Map;
 
-
 public class ConsultationsHandler extends ApiHandler {
-
 
     public ConsultationsHandler(BdManager bdManager) {
         super(bdManager);
     }
-
 
     @Override
     protected void gererGet(HttpExchange echange) throws IOException {
@@ -48,6 +45,7 @@ public class ConsultationsHandler extends ApiHandler {
                 int idPatient = Integer.parseInt(idPatientStr);
                 ArrayList<Consultation> consultationsFiltrees = new ArrayList<>();
                 for (Consultation c : consultations) {
+                    // Si l'id patient correspond, on garde la consultation
                     if (c.getPatient_id() != null && c.getPatient_id() == idPatient) {
                         consultationsFiltrees.add(c);
                     }
@@ -58,6 +56,8 @@ public class ConsultationsHandler extends ApiHandler {
                 return;
             }
         } else {
+            // Si pas de patientId, on ne garde que les consultations libres (patientId ==
+            // null)
             ArrayList<Consultation> consultationsFiltrees = new ArrayList<>();
             for (Consultation c : consultations) {
                 if (c.getPatient_id() == null) {
@@ -70,15 +70,19 @@ public class ConsultationsHandler extends ApiHandler {
         envoyerJson(echange, 200, consultations);
     }
 
-
     @Override
     protected void gererPut(HttpExchange echange) throws IOException {
+        // Etape 1 : Récupérer l'ID de la consultation dans l'URL
         Map<String, String> parametres = obtenirParametresRequete(echange);
         String idStr = parametres.get("id");
+
+        // On vérifie que l'ID est bien présent
         if (idStr == null) {
             envoyerErreur(echange, 400, "Paramètre 'id' manquant");
             return;
         }
+
+        // On convertit l'ID en entier
         int idConsultation;
         try {
             idConsultation = Integer.parseInt(idStr);
@@ -87,94 +91,85 @@ public class ConsultationsHandler extends ApiHandler {
             return;
         }
 
+        // Etape 2 : Lire le corps de la requête (les données envoyées)
         String corps = lireCorps(echange);
-        if (corps == null || corps.trim().isEmpty()) {
+        if (corps == null || corps.isEmpty()) {
             envoyerErreur(echange, 400, "Body de la requête vide");
             return;
         }
 
+        // Etape 3 : Transformer le corps (JSON ou Formulaire) en une liste de données
+        // simple (Map)
+        Map<String, String> donnees = new HashMap<>(); // On va stocker les infos ici
         String typeContenu = echange.getRequestHeaders().getFirst("Content-Type");
 
-        Map<String, String> donnees;
         if (typeContenu != null && typeContenu.contains("json")) {
+            // C'est du JSON, on le traite
             try {
                 Map<String, Object> json = RestUtils.parserJson(corps, Map.class);
                 if (json == null) {
                     envoyerErreur(echange, 400, "Format JSON invalide");
                     return;
                 }
-                donnees = new HashMap<>();
-                for (Map.Entry<String, Object> entree : json.entrySet()) {
-                    Object valeur = entree.getValue();
-                    String cle = entree.getKey();
+                // On parcourt chaque élément du JSON pour le mettre dans notre Map 'donnees'
+                for (Map.Entry<String, Object> entry : json.entrySet()) {
+                    String cle = entry.getKey();
+                    Object valeur = entry.getValue();
+
                     if (valeur == null) {
                         donnees.put(cle, null);
                     } else if (valeur instanceof Number) {
-
-                        int valeurInt = ((Number) valeur).intValue();
-                        donnees.put(cle, String.valueOf(valeurInt));
-                        System.out.println("DEBUG: " + cle + " = " + valeur + " (type: " + valeur.getClass().getSimpleName() + ") -> " + valeurInt);
+                        // Si c'est un nombre (ex: 123), on le met en texte
+                        int valeurEntiere = ((Number) valeur).intValue();
+                        donnees.put(cle, String.valueOf(valeurEntiere));
                     } else {
-                        String valeurStr = valeur.toString();
-                        donnees.put(cle, valeurStr);
-                        System.out.println("DEBUG: " + cle + " = " + valeurStr + " (type: " + valeur.getClass().getSimpleName() + ")");
+                        // Sinon c'est du texte, on le prend tel quel
+                        donnees.put(cle, valeur.toString());
                     }
                 }
             } catch (Exception e) {
-                envoyerErreur(echange, 400, "Erreur de parsing JSON: " + e.getMessage());
+                envoyerErreur(echange, 400, "Erreur lors de la lecture du JSON");
                 return;
             }
         } else {
+            // Ce n'est pas du JSON (c'est probablement un formulaire standard), on utilise
+            // notre utilitaire
             donnees = RestUtils.parserFormulaire(corps);
         }
 
+        // Etape 4 : Récupérer les informations précises (patientId et reason)
         String idPatientStr = donnees.get("patientId");
-        int longueurPatientId;
-        if (idPatientStr != null) {
-            longueurPatientId = idPatientStr.length();
-        } else {
-            longueurPatientId = 0;
-        }
-        System.out.println("DEBUG: patientId reçu = '" + idPatientStr + "' (longueur: " + longueurPatientId + ")");
+        String raison = donnees.get("reason");
+
         if (idPatientStr == null) {
             envoyerErreur(echange, 400, "Champ 'patientId' manquant");
             return;
         }
+
         int idPatient;
         try {
-
-
-            idPatientStr = idPatientStr.trim();
-            System.out.println("DEBUG: patientId après trim = '" + idPatientStr + "'");
-            double patientIdDouble = Double.parseDouble(idPatientStr);
-            idPatient = (int) patientIdDouble;
-            System.out.println("DEBUG: patientId parsé = " + idPatient + " (double: " + patientIdDouble + ")");
-            if (patientIdDouble != idPatient) {
-                envoyerErreur(echange, 400, "Format invalide pour patientId: doit être un entier (reçu: " + patientIdDouble + ")");
-                return;
-            }
+            idPatient = Integer.parseInt(idPatientStr.trim());
         } catch (NumberFormatException e) {
-            System.out.println("DEBUG: Exception lors du parsing: " + e.getMessage());
-            envoyerErreur(echange, 400, "Format invalide pour patientId: '" + idPatientStr + "' (" + e.getMessage() + ")");
+            envoyerErreur(echange, 400, "Le patientId doit être un nombre entier");
             return;
         }
-        String raison = donnees.get("reason");
 
+        // Etape 5 : Enregistrer la réservation dans la base de données
         Connection connexion = obtenirConnexion();
         ConsultationDAO dao = new ConsultationDAO(connexion);
         boolean succes = dao.bookConsultation(idConsultation, idPatient, raison);
 
+        // Etape 6 : Envoyer la réponse au client
         Map<String, Object> reponse = new HashMap<>();
         reponse.put("success", succes);
-        int codeReponse;
-        if (succes) {
-            codeReponse = 200;
-        } else {
-            codeReponse = 400;
-        }
-        envoyerJson(echange, codeReponse, reponse);
-    }
 
+        if (succes) {
+            envoyerJson(echange, 200, reponse);
+        } else {
+            envoyerJson(echange, 400, reponse);
+        }
+
+    }
 
     @Override
     protected void gererDelete(HttpExchange echange) throws IOException {
@@ -207,4 +202,3 @@ public class ConsultationsHandler extends ApiHandler {
         envoyerJson(echange, codeReponse, reponse);
     }
 }
-

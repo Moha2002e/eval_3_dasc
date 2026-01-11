@@ -11,14 +11,11 @@ import java.sql.Connection;
 import java.util.HashMap;
 import java.util.Map;
 
-
 public class PatientsHandler extends ApiHandler {
-
 
     public PatientsHandler(BdManager bdManager) {
         super(bdManager);
     }
-
 
     @Override
     protected void gererPost(HttpExchange echange) throws IOException {
@@ -29,8 +26,15 @@ public class PatientsHandler extends ApiHandler {
         if (typeContenu != null && typeContenu.contains("json")) {
             Map<String, Object> json = RestUtils.parserJson(corps, Map.class);
             donnees = new HashMap<>();
-            for (Map.Entry<String, Object> entree : json.entrySet()) {
-                donnees.put(entree.getKey(), entree.getValue().toString());
+            if (json != null) {
+                for (Map.Entry<String, Object> entry : json.entrySet()) {
+                    Object val = entry.getValue();
+                    if (val != null) {
+                        donnees.put(entry.getKey(), val.toString());
+                    } else {
+                        donnees.put(entry.getKey(), null);
+                    }
+                }
             }
         } else {
             donnees = RestUtils.parserFormulaire(corps);
@@ -46,6 +50,7 @@ public class PatientsHandler extends ApiHandler {
             return;
         }
 
+        // On vérifie si c'est un nouveau patient
         boolean nouveauPatient = "true".equals(nouveauPatientStr);
 
         Connection connexion = obtenirConnexion();
@@ -53,6 +58,7 @@ public class PatientsHandler extends ApiHandler {
 
         int idPatient;
         if (nouveauPatient) {
+            // Création d'un nouveau patient
             Patient patient = new Patient();
             patient.setLast_name(nom);
             patient.setFirst_name(prenom);
@@ -77,4 +83,3 @@ public class PatientsHandler extends ApiHandler {
         envoyerJson(echange, 200, reponse);
     }
 }
-
